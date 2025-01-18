@@ -1,0 +1,145 @@
+2.	#include <WiFi.h>
+3.	#include <FirebaseESP32.h>
+4.	#include <Wire.h>
+5.	#include <LiquidCrystal_I2C.h>
+6.	
+7.	// LCD Configuration
+8.	#define I2C_ADDR 0x27
+9.	#define LCD_COLUMNS 16
+10.	#define LCD_ROWS 2
+11.	
+12.	// Pressure Sensor Configuration
+13.	const int SENSOR_PIN = 32;
+14.	
+15.	// Pressure thresholds (in PSI)
+16.	#define PRESSURE_LOW 30
+17.	#define PRESSURE_HIGH 36
+18.	
+19.	// Firebase Configuration
+20.	FirebaseData fbdo;
+21.	FirebaseConfig config;
+22.	FirebaseAuth auth;
+23.	
+24.	// Wi-Fi Credentials
+25.	const char* ssid = "Nothing Phone (2)_6176";  
+26.	const char* password = "123456678";  
+27.	
+28.	// Firebase Database URL and Authentication Token
+29.	const char* firebaseHost = "https://systemapp-cc9f4-default-rtdb.firebaseio.com/";
+30.	const char* firebaseAuth = "vBrltAF8u8PipT0im2v2Dk5q8HIVZ8BGtb2UcY9r";
+31.	
+32.	// LCD object
+33.	LiquidCrystal_I2C lcd(I2C_ADDR, LCD_COLUMNS, LCD_ROWS);
+34.	
+35.	// Variables to manage data updates
+36.	unsigned long lastUpdateTime = 0;
+37.	unsigned long updateInterval = 5000; // Update every 5 seconds
+38.	
+39.	void setup() {
+40.	  Serial.begin(115200);
+41.	
+42.	  // Initialize LCD
+43.	  lcd.init();
+44.	  lcd.backlight();
+45.	  lcd.setCursor(0, 0);
+46.	  lcd.print("TPMS System");
+47.	  lcd.setCursor(0, 1);
+48.	  lcd.print("Initializing...");
+49.	  delay(2000);
+50.	  lcd.clear();
+51.	
+52.	  // Configure ADC
+53.	  analogReadResolution(12);       
+54.	  analogSetAttenuation(ADC_11db);  
+55.	
+56.	  // Initialize Wi-Fi
+57.	  lcd.setCursor(0, 0);
+58.	  lcd.print("Connecting WiFi");
+59.	  WiFi.begin(ssid, password);
+60.	  while (WiFi.status() != WL_CONNECTED) {
+61.	    delay(500);
+62.	    Serial.print(".");
+63.	  }
+64.	  Serial.println("\nWiFi Connected!");
+65.	  lcd.clear();
+66.	  lcd.setCursor(0, 0);
+67.	  lcd.print("WiFi Connected!");
+68.	
+69.	  // Configure Firebase
+70.	  config.host = firebaseHost;
+71.	  config.signer.tokens.legacy_token = firebaseAuth;
+72.	  Firebase.begin(&config, &auth);
+73.	  Firebase.reconnectWiFi(true);
+74.	
+75.	  if (Firebase.ready()) {
+76.	    Serial.println("Firebase initialized!");
+77.	    lcd.setCursor(0, 1);
+78.	    lcd.print("Firebase Ready!");
+79.	  } else {
+80.	    Serial.println("Firebase initialization failed!");
+81.	    lcd.setCursor(0, 1);
+82.	    lcd.print("Firebase Error!");
+83.	    delay(5000);
+84.	    while (true);
+85.	  }
+86.	}
+87.	
+88.	void loop() {
+89.	  unsigned long currentMillis = millis();
+90.	
+91.	  if (currentMillis - lastUpdateTime >= updateInterval) {
+92.	    lastUpdateTime = currentMillis;
+93.	    sendTireData();
+94.	  }
+95.	}
+96.	
+97.	void sendTireData() {
+98.	  delay(10);  // Allow ADC to stabilize
+99.	  int sensorValue = analogRead(SENSOR_PIN);
+100.	  float pressure = mapSensorToPSI(sensorValue);
+101.	
+102.	  // Determine pressure status
+103.	  String status;
+104.	  if (pressure < PRESSURE_LOW) {
+105.	    status = "Low";
+106.	  } else if (pressure > PRESSURE_HIGH) {
+107.	    status = "High";
+108.	  } else {
+109.	    status = "Normal";
+110.	  }
+111.	
+112.	  // Print to Serial Monitor for debugging
+113.	  Serial.print("Pressure (PSI): ");
+114.	  Serial.print(pressure, 1);
+115.	  Serial.print(", Status: ");
+116.	  Serial.println(status);
+117.	
+118.	  // Display on LCD
+119.	  lcd.clear();
+120.	  lcd.setCursor(0, 0);
+121.	  lcd.print("Pressure: ");
+122.	  lcd.print(pressure, 1);
+123.	  lcd.print(" PSI");
+124.	  lcd.setCursor(0, 1);
+125.	  lcd.print("Status: ");
+126.	  lcd.print(status);
+127.	
+128.	  // Send data to Firebase
+129.	  if (Firebase.ready()) {
+130.	    if (!Firebase.setFloat(fbdo, "/vehicle/tirePressure", pressure)) {
+131.	      Serial.print("Failed to update pressure: ");
+132.	      Serial.println(fbdo.errorReason());
+133.	    }
+134.	    if (!Firebase.setString(fbdo, "/vehicle/status", status)) {
+135.	      Serial.print("Failed to update status: ");
+136.	      Serial.println(fbdo.errorReason());
+137.	    }
+138.	  } else {
+139.	    Serial.println("Firebase not ready.");
+140.	  }
+141.	}
+142.	
+143.	float mapSensorToPSI(int sensorValue) {
+144.	  sensorValue = constrain(sensorValue, 0, 214);
+145.	  return map(sensorValue, 0, 214, 0, 100);
+146.	}
