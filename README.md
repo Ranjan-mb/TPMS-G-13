@@ -47,7 +47,7 @@ This project aims to design and develop a cost-effective Tire Pressure Monitorin
 ### Software Setup
 1. Clone this repository:
    ```bash
-   git clone https://github.com/your-username/tpms.git
+   git clone https://github.com/TPMS-G-13/tpms.git
 Install the required libraries in Arduino IDE.
 Flash the ESP32 with the firmware from the ESP32_Firmware folder.
 Set up the Android app:
