@@ -30,7 +30,7 @@ This project aims to design and develop a cost-effective Tire Pressure Monitorin
 - **Firebase or Custom Backend (optional)**: To store and retrieve historical data
 - **Libraries**:
   - `WiFi.h`: ESP32 Wi-Fi library
-  - Sensor-specific libraries (e.g., `Adafruit_BMP280`, `Adafruit_BME280`)
+  - Sensor-specific libraries (e.g., `Adafruit_xgzp168`, `Adafruit_BME280`)
 
 ---
 
